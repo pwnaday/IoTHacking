@@ -2,7 +2,6 @@
 #define __UART_C__
 #include <pthread.h>
 #include "UART.h"
-
 int8_t rxbuf[__RX_BUFFER_SIZE];
 int8_t txbuf[__TX_BUFFER_SIZE];
 int uart_fd = -1;
