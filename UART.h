@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#define DEBUG		    0
 #define __BAUD_RATE	    57600
 #define	__READ_BLOCK	    0x0
 #define __PACKET_SIZE	    CS8
@@ -33,7 +34,12 @@ struct serial_console {
     tty_t	tty;
 };
 typedef struct serial_console serial_t;
+#if DEBUG == 0
 static const char* dev_name = "/dev/ttyUSB0";
+#endif
+#if DEBUG == 1
+static const char* dev_name = "/dev/pts/2";
+#endif
 extern int uart_fd; 
 extern int set_ack();
 extern int  config_uart_io (int fd, int rate, int parity);
@@ -42,6 +48,6 @@ extern void uart_puts(const int8_t* str);
 extern void uart_put (void* data, size_t size);
 extern ssize_t uart_read(void* buf, size_t length);
 extern int uart_init(const int8_t* serial_port, int baud_rate, int to_block);
-
+extern void init_serial_uart(serial_t* s);
 #endif
 

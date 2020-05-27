@@ -104,18 +104,18 @@ static void tx_data()
     int buflen = 0;
     while ((txbuf[buflen++] = getchar()) != '\n');
 }
-    
+
 static void *rx_tx_thread(void *arg) {
     //while (1) {
-	pthread_mutex_lock(&mtx);
-	while (!ack_en) {
-	    pthread_cond_wait(&cv, &mtx);
-	}
-	bzero(rxbuf, __RX_BUFFER_SIZE);
-	bzero(txbuf, __TX_BUFFER_SIZE);
-	uart_read(rxbuf, __RX_BUFFER_SIZE);
-	ack_en = 0;
-	pthread_mutex_unlock(&mtx);
+    pthread_mutex_lock(&mtx);
+    while (!ack_en) {
+	pthread_cond_wait(&cv, &mtx);
+    }
+    bzero(rxbuf, __RX_BUFFER_SIZE);
+    bzero(txbuf, __TX_BUFFER_SIZE);
+    uart_read(rxbuf, __RX_BUFFER_SIZE);
+    ack_en = 0;
+    pthread_mutex_unlock(&mtx);
     //}
     return NULL;
 }
@@ -123,11 +123,11 @@ static void *rx_tx_thread(void *arg) {
 
 static void *uart_thread(void *arg)
 {
-	pthread_mutex_lock(&mtx);
-	pthread_cond_signal(&cv);
-	uart_puts((const int8_t*)txbuf);
-	uart_read(rxbuf, __RX_BUFFER_SIZE);
-	pthread_mutex_unlock(&mtx);
+    pthread_mutex_lock(&mtx);
+    pthread_cond_signal(&cv);
+    uart_puts((const int8_t*)txbuf);
+    uart_read(rxbuf, __RX_BUFFER_SIZE);
+    pthread_mutex_unlock(&mtx);
     return NULL;
 }
 
@@ -137,15 +137,15 @@ int main()
     if (!uart_init(dev_name, B57600, __READ_BLOCK)) {
 	return -1;
     }
-    //pthread_t tid1;
+    pthread_t tid1;
     pthread_t tid2;
-    //pthread_create(&tid1, NULL, rx_tx_thread, NULL);
+    pthread_create(&tid1, NULL, rx_tx_thread, NULL);
     pthread_create(&tid2, NULL, uart_thread, NULL);
-    //printf("Joining thread 1...\n");
-    //pthread_join(tid1, NULL);
-    //printf("Joining thread 2...\n");
+    printf("Joining thread 1...\n");
+    pthread_join(tid1, NULL);
+    printf("Joining thread 2...\n");
     pthread_join(tid2, NULL);
-    //printf("Running...\n");
+    printf("Running...\n");
     for (;;) {
 	//printf("%s\n", rxbuf);
 	rx_data();
