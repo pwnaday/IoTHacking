@@ -33,7 +33,7 @@ int config_uart_io (int fd, int rate, int parity)
     cfsetospeed(&tty, rate); 
     cfsetispeed(&tty, rate);
     tty.c_cflag     = (tty.c_cflag & ~CSIZE) | CS8; /* CS8 encoding */
-    tty.c_iflag     &= ~IGNBRK;
+    tty.c_iflag     &= ~IGNBRK | ~ECHO;
 
     tty.c_lflag     = 0;
     tty.c_oflag     = 0;
@@ -129,15 +129,15 @@ static void* tx_data(void*arg) {
 	    }
 	    uart_puts(txbuf + length);
 	}
-	    
 	if (c == '\n' || c == '\r' || c == '\0') {
 	    txbuf[buflen] = c;
 	    uart_puts(txbuf);
-	    bzero(txbuf, __TX_BUFFER_SIZE);
+	    memset((void*)txbuf, 0, __TX_BUFFER_SIZE);
 	    buflen = 0;
 	} else {
 	    txbuf[buflen++] = c;
 	}
+
 	pthread_mutex_unlock(&mtx);
     }
 }

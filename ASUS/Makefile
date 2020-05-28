@@ -1,9 +1,10 @@
-EXENAME = uart
-OBJS = UART.o
-CXX = gcc
-CXXFLAGS = -g -pthread
-LD = gcc
-LDFLAGS = -g -lc -lpthread
+EXENAME  = uart
+OBJS     = UART.o
+CXX      = gcc
+CXXFLAGS = -g -pthread -lc
+LD       = gcc
+LDFLAGS  = -g -lc -lpthread
+
 all: $(EXENAME)
 
 $(EXENAME) : $(OBJS)
