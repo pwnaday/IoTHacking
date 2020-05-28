@@ -27,17 +27,6 @@
 #define __TX_BUFFER_SIZE    0x80
 typedef struct termios tty_t;
 typedef unsigned char uint8_t;
-struct serial_console {
-    int         fd;
-    int         state;
-    int         active;
-    int8_t      rxbuf[__RX_BUFFER_SIZE];
-    uint32_t    start;
-    uint32_t    end;
-    pthread_t   rx_thread;
-    tty_t	tty;
-};
-typedef struct serial_console serial_t;
 #if DEBUG == 0
 static const char* dev_name = "/dev/ttyUSB0";
 #endif
@@ -52,6 +41,5 @@ extern void uart_puts(const int8_t* str);
 extern void uart_put (void* data, size_t size);
 extern ssize_t uart_read(void* buf, size_t length);
 extern int uart_init(const int8_t* serial_port, int baud_rate, int to_block);
-extern void init_serial_uart(serial_t* s);
 #endif
 
