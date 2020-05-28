@@ -14,6 +14,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+/* Serial console parameters:
+ * Intended for connecting to an ASUS TEW-827DRU/A H/W 2.0R router over UART.
+ * Used for sending/recieving data to/from a root shell.
+*/
 #define DEBUG		    0
 #define __BAUD_RATE	    57600
 #define	__READ_BLOCK	    0x0

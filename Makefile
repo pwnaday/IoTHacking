@@ -3,7 +3,7 @@ OBJS = UART.o
 CXX = gcc
 CXXFLAGS = -g -pthread
 LD = gcc
-LDFLAGS = -lc -lpthread
+LDFLAGS = -g -lc -lpthread
 all: $(EXENAME)
 
 $(EXENAME) : $(OBJS)

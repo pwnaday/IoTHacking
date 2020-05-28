@@ -1,14 +1,27 @@
+/*
+ *  Basic serial console device driver code for communicating over USB UART. Async I/O works but is a bit sketchy.
+ *  Version: 1.0
+ *  Date   : 05/25/2020
+ *  Author : @pwnaday
+ *
+ */
 #ifndef __UART_C__
 #define __UART_C__
 #include <pthread.h>
 #include "UART.h"
-int8_t rxbuf[__RX_BUFFER_SIZE];
-int8_t txbuf[__TX_BUFFER_SIZE];
-int uart_fd = -1;
-volatile int ack_en = 0;
-static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  cv  = PTHREAD_COND_INITIALIZER;
 
+int8_t rxbuf[__RX_BUFFER_SIZE]; /* Data from device */
+int8_t txbuf[__TX_BUFFER_SIZE]; /* Data to device   */
+
+int uart_fd            = -1;
+volatile int buflen    = 0;
+volatile int ack_en    = 1;
+
+/* Synchronization vars */
+static pthread_mutex_t   mtx;
+static pthread_cond_t    cv;
+
+/* Sets up Serial device */
 int config_uart_io (int fd, int rate, int parity)
 {
     tty_t tty;
@@ -17,9 +30,9 @@ int config_uart_io (int fd, int rate, int parity)
 	fprintf(stderr, "[tcgetattr] error %x recieved\n", errno);
 	return -1;
     }
-    cfsetospeed(&tty, rate);
+    cfsetospeed(&tty, rate); 
     cfsetispeed(&tty, rate);
-    tty.c_cflag     = (tty.c_cflag & ~CSIZE) | CS8;
+    tty.c_cflag     = (tty.c_cflag & ~CSIZE) | CS8; /* CS8 encoding */
     tty.c_iflag     &= ~IGNBRK;
 
     tty.c_lflag     = 0;
@@ -27,6 +40,7 @@ int config_uart_io (int fd, int rate, int parity)
     tty.c_cc[VMIN]  = 0;
     tty.c_cc[VTIME] = 5;
 
+    /* tty attributes */
     tty.c_cflag    |= (CLOCAL | CREAD);
     tty.c_cflag    |= parity;
     tty.c_iflag    &= ~(IXON | IXOFF | IXANY);
@@ -40,6 +54,7 @@ int config_uart_io (int fd, int rate, int parity)
     return 0;
 }
 
+/* Configures serial device blocking */
 void config_blocking(int fd, int flag)
 {
     tty_t tty;
@@ -56,22 +71,26 @@ void config_blocking(int fd, int flag)
     return;
 }
 
+/* writes a string to device */
 void uart_puts(const int8_t* str)
 {
     write(uart_fd, str, strlen(str));
     return;
 }
 
+/* more generic helper function to send data to device in packets of size size */
 void uart_put(void* data, size_t size)
 {
     write(uart_fd, data, size);
 }
 
+/* read device data */
 ssize_t uart_read(void* buf, size_t length)
 {
     return read(uart_fd, buf, length);
 }
 
+/* initialize serial device */
 int uart_init(const int8_t* serial_port, int baud_rate, int to_block)
 {
     uart_fd = open(serial_port, O_RDWR | O_NOCTTY | O_SYNC);
@@ -85,6 +104,7 @@ int uart_init(const int8_t* serial_port, int baud_rate, int to_block)
     return 1;
 }
 
+/* set ack flag for async  I/O */
 int set_ack()
 {
     pthread_mutex_lock(&mtx);
@@ -93,45 +113,42 @@ int set_ack()
     pthread_mutex_unlock(&mtx);
     return 0;
 }
-static void rx_data()
-{
-    bzero(rxbuf, __RX_BUFFER_SIZE);
-    uart_read(rxbuf, __RX_BUFFER_SIZE);
-}
-static void tx_data()
-{
-    bzero(txbuf, __TX_BUFFER_SIZE);
-    int buflen = 0;
-    while ((txbuf[buflen++] = getchar()) != '\n');
-}
 
-static void *rx_tx_thread(void *arg) {
-    //while (1) {
-    pthread_mutex_lock(&mtx);
-    while (!ack_en) {
-	pthread_cond_wait(&cv, &mtx);
+/* keyboard thread */
+volatile int8_t c;
+static void* tx_data(void*arg) {
+    while (1) {
+	pthread_mutex_lock(&mtx);
+	c = getchar();
+	if (buflen >= __TX_BUFFER_SIZE) {
+	    int length = 0;
+	    while (length < buflen) {
+		uart_puts(txbuf + length);
+		length += __TX_BUFFER_SIZE;
+		buflen -= length;
+	    }
+	    uart_puts(txbuf + length);
+	}
+	    
+	if (c == '\n' || c == '\r' || c == '\0') {
+	    txbuf[buflen] = c;
+	    uart_puts(txbuf);
+	    bzero(txbuf, __TX_BUFFER_SIZE);
+	    buflen = 0;
+	} else {
+	    txbuf[buflen++] = c;
+	}
+	pthread_mutex_unlock(&mtx);
     }
+}
+    
+/* RX handler */
+static void rx_data() {
     bzero(rxbuf, __RX_BUFFER_SIZE);
-    bzero(txbuf, __TX_BUFFER_SIZE);
     uart_read(rxbuf, __RX_BUFFER_SIZE);
-    ack_en = 0;
-    pthread_mutex_unlock(&mtx);
-    //}
-    return NULL;
 }
 
-
-static void *uart_thread(void *arg)
-{
-    pthread_mutex_lock(&mtx);
-    pthread_cond_signal(&cv);
-    uart_puts((const int8_t*)txbuf);
-    uart_read(rxbuf, __RX_BUFFER_SIZE);
-    pthread_mutex_unlock(&mtx);
-    return NULL;
-}
-
-
+/* driver code */
 int main()
 {
     if (!uart_init(dev_name, B57600, __READ_BLOCK)) {
@@ -139,18 +156,14 @@ int main()
     }
     pthread_t tid1;
     pthread_t tid2;
-    pthread_create(&tid1, NULL, rx_tx_thread, NULL);
-    pthread_create(&tid2, NULL, uart_thread, NULL);
-    printf("Joining thread 1...\n");
-    pthread_join(tid1, NULL);
-    printf("Joining thread 2...\n");
-    pthread_join(tid2, NULL);
-    printf("Running...\n");
-    for (;;) {
-	//printf("%s\n", rxbuf);
+    pthread_attr_t attr;
+    pthread_mutex_init(&mtx, NULL);                              /* RX/TX mutex          */
+    pthread_cond_init(&cv, NULL);                                /* Condition variable   */
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE); /* threads are joinable */
+    pthread_create(&tid1, NULL, tx_data, (void*)txbuf); 
+    for (;;) {                                                   /* spin nicely          */
 	rx_data();
 	printf("%s", rxbuf);
-	tx_data();
     }
     return 0;
 }
